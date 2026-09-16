@@ -3,7 +3,6 @@
  * Copyright (c) 2026 Warren Musungu
  * https://github.com/truelogic-lab/warren-xmd
  */
-
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -23,6 +22,9 @@ const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 
+// ============================================
+// AUTH MIDDLEWARE
+// ============================================
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'];
   if (key !== process.env.API_KEY) {
@@ -31,14 +33,20 @@ function requireApiKey(req, res, next) {
   next();
 }
 
+// ============================================
+// CONNECT — request pairing code
+// ============================================
 app.post('/connect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Phone number required' });
 
   const cleanPhone = phone.replace(/\D/g, '');
-  if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid phone number format' });
+  if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+    return res.status(400).json({ error: 'Invalid phone number format' });
+  }
 
   try {
+    // Already connected?
     if (listSessions().includes(cleanPhone)) {
       return res.json({ status: 'already_connected', phone: cleanPhone });
     }
@@ -47,6 +55,8 @@ app.post('/connect', requireApiKey, async (req, res) => {
     attachMessageHandler(sessionData);
 
     const sock = sessionData.sock;
+
+    // Wait for socket to be ready before requesting pairing code
     await new Promise(r => setTimeout(r, 2000));
 
     if (!sock.authState.creds.registered) {
@@ -55,34 +65,57 @@ app.post('/connect', requireApiKey, async (req, res) => {
         status: 'pairing_code',
         phone: cleanPhone,
         code,
-        instructions: 'WhatsApp → Linked Devices → Link with phone number instead',
+        instructions: 'WhatsApp → Settings → Linked Devices → Link a Device → Link with phone number instead',
       });
-    } else {
-      return res.json({ status: 'already_registered', phone: cleanPhone });
     }
+
+    return res.json({ status: 'already_registered', phone: cleanPhone });
   } catch (err) {
     console.error('Connect error:', err);
     return res.status(500).json({ error: err.message });
   }
 });
 
+// ============================================
+// STATUS — check if a session is active
+// ============================================
 app.get('/status/:phone', requireApiKey, (req, res) => {
   const cleanPhone = req.params.phone.replace(/\D/g, '');
   res.json({ phone: cleanPhone, active: listSessions().includes(cleanPhone) });
 });
 
-app.get('/sessions', requireApiKey, (req, res) => {
-  res.json({ count: sessionCount(), sessions: listSessions() });
+// ============================================
+// SESSIONS — list all active sessions
+// ============================================
+app.get('/sessions', requireApiKey, async (req, res) => {
+  let proxies = [];
+  try {
+    const { proxyStats } = await import('./lib/proxy.js');
+    proxies = await proxyStats();
+  } catch {}
+
+  res.json({
+    count: sessionCount(),
+    sessions: listSessions(),
+    proxies,
+  });
 });
 
+// ============================================
+// DISCONNECT — remove a session
+// ============================================
 app.post('/disconnect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Phone number required' });
   const cleanPhone = phone.replace(/\D/g, '');
+
   const removed = await removeSession(cleanPhone);
   res.json({ phone: cleanPhone, removed });
 });
 
+// ============================================
+// CACHE / RELOAD / INVALIDATE — dev tools
+// ============================================
 app.get('/cache', requireApiKey, async (req, res) => {
   const { cache } = await import('./lib/cache.js');
   res.json({ size: cache.size() });
@@ -100,6 +133,9 @@ app.post('/invalidate', requireApiKey, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ============================================
+// HEALTH — public health check
+// ============================================
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -109,6 +145,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ============================================
+// BOOTSTRAP — restore sessions on startup
+// ============================================
 async function bootstrap() {
   const dbReady = await initDatabase();
   if (!dbReady) {
@@ -137,7 +176,7 @@ async function bootstrap() {
   }
 
   const PORT = process.env.PORT || 3000;
-  const HOST = '0.0.0.0'; // Required for Railway/Docker
+  const HOST = '0.0.0.0';
 
   app.listen(PORT, HOST, () => {
     console.log(`\n🚀 ${settings.botName} API running on http://${HOST}:${PORT}`);
@@ -146,7 +185,15 @@ async function bootstrap() {
   });
 }
 
+// Graceful shutdown
 process.on('SIGTERM', async () => {
+  console.log('SIGTERM received — closing...');
+  await closeDatabase();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received — closing...');
   await closeDatabase();
   process.exit(0);
 });
