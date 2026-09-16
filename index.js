@@ -18,6 +18,21 @@ import {
 
 dotenv.config();
 
+// ============================================
+// INSTANCE SHARDING
+// Static sharding — every session maps to a fixed instance.
+// When INSTANCE_COUNT=1, this instance handles everything (default).
+// ============================================
+const INSTANCE_ID = parseInt(process.env.INSTANCE_ID || '0');
+const INSTANCE_COUNT = parseInt(process.env.INSTANCE_COUNT || '1');
+
+if (INSTANCE_ID >= INSTANCE_COUNT) {
+  console.error(`❌ INSTANCE_ID (${INSTANCE_ID}) must be < INSTANCE_COUNT (${INSTANCE_COUNT})`);
+  process.exit(1);
+}
+
+console.log(`🧩 Instance ${INSTANCE_ID} of ${INSTANCE_COUNT}`);
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
@@ -35,6 +50,7 @@ function requireApiKey(req, res, next) {
 
 // ============================================
 // CONNECT — request pairing code
+// The instance that receives the /connect request becomes the owner.
 // ============================================
 app.post('/connect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
@@ -45,8 +61,17 @@ app.post('/connect', requireApiKey, async (req, res) => {
     return res.status(400).json({ error: 'Invalid phone number format' });
   }
 
+  // In multi-instance mode, only the shard owner should accept /connect
+  const shard = parseInt(cleanPhone) % INSTANCE_COUNT;
+  if (shard !== INSTANCE_ID) {
+    return res.status(409).json({
+      error: 'Wrong instance',
+      message: `This session belongs to instance ${shard}. Route /connect to the correct backend.`,
+      correctInstance: shard,
+    });
+  }
+
   try {
-    // Already connected?
     if (listSessions().includes(cleanPhone)) {
       return res.json({ status: 'already_connected', phone: cleanPhone });
     }
@@ -55,8 +80,6 @@ app.post('/connect', requireApiKey, async (req, res) => {
     attachMessageHandler(sessionData);
 
     const sock = sessionData.sock;
-
-    // Wait for socket to be ready before requesting pairing code
     await new Promise(r => setTimeout(r, 2000));
 
     if (!sock.authState.creds.registered) {
@@ -65,6 +88,7 @@ app.post('/connect', requireApiKey, async (req, res) => {
         status: 'pairing_code',
         phone: cleanPhone,
         code,
+        instance: INSTANCE_ID,
         instructions: 'WhatsApp → Settings → Linked Devices → Link a Device → Link with phone number instead',
       });
     }
@@ -81,11 +105,15 @@ app.post('/connect', requireApiKey, async (req, res) => {
 // ============================================
 app.get('/status/:phone', requireApiKey, (req, res) => {
   const cleanPhone = req.params.phone.replace(/\D/g, '');
-  res.json({ phone: cleanPhone, active: listSessions().includes(cleanPhone) });
+  res.json({
+    phone: cleanPhone,
+    active: listSessions().includes(cleanPhone),
+    instance: INSTANCE_ID,
+  });
 });
 
 // ============================================
-// SESSIONS — list all active sessions
+// SESSIONS — list all active sessions (this instance only)
 // ============================================
 app.get('/sessions', requireApiKey, async (req, res) => {
   let proxies = [];
@@ -95,6 +123,8 @@ app.get('/sessions', requireApiKey, async (req, res) => {
   } catch {}
 
   res.json({
+    instance: INSTANCE_ID,
+    instanceCount: INSTANCE_COUNT,
     count: sessionCount(),
     sessions: listSessions(),
     proxies,
@@ -110,7 +140,43 @@ app.post('/disconnect', requireApiKey, async (req, res) => {
   const cleanPhone = phone.replace(/\D/g, '');
 
   const removed = await removeSession(cleanPhone);
-  res.json({ phone: cleanPhone, removed });
+  res.json({ phone: cleanPhone, removed, instance: INSTANCE_ID });
+});
+
+// ============================================
+// CLUSTER — global view across all instances
+// ============================================
+app.get('/cluster', requireApiKey, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 
+         CAST(phone_number AS BIGINT) % $1 AS shard,
+         COUNT(*) AS count
+       FROM (
+         SELECT DISTINCT phone_number FROM auth_state WHERE key LIKE 'creds%'
+       ) AS sessions
+       GROUP BY shard
+       ORDER BY shard`,
+      [INSTANCE_COUNT]
+    );
+
+    const shards = rows.map(r => ({
+      instance: parseInt(r.shard),
+      sessions: parseInt(r.count),
+      isThisInstance: parseInt(r.shard) === INSTANCE_ID,
+    }));
+
+    const total = shards.reduce((sum, s) => sum + s.sessions, 0);
+
+    res.json({
+      instanceCount: INSTANCE_COUNT,
+      thisInstance: INSTANCE_ID,
+      totalSessions: total,
+      shards,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================
@@ -140,13 +206,15 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     bot: settings.botName,
+    instance: INSTANCE_ID,
+    instanceCount: INSTANCE_COUNT,
     activeSessions: sessionCount(),
     uptime: process.uptime(),
   });
 });
 
 // ============================================
-// BOOTSTRAP — restore sessions on startup
+// BOOTSTRAP — restore only THIS instance's sessions
 // ============================================
 async function bootstrap() {
   const dbReady = await initDatabase();
@@ -156,10 +224,16 @@ async function bootstrap() {
   }
 
   try {
+    // Filter sessions to this shard only
     const { rows } = await pool.query(
-      "SELECT DISTINCT phone_number FROM auth_state WHERE key LIKE 'creds%'"
+      `SELECT DISTINCT phone_number 
+       FROM auth_state 
+       WHERE key LIKE 'creds%' 
+       AND (CAST(phone_number AS BIGINT) % $1) = $2`,
+      [INSTANCE_COUNT, INSTANCE_ID]
     );
-    console.log(`🔍 Found ${rows.length} existing session(s) in database`);
+
+    console.log(`🔍 Instance ${INSTANCE_ID} owns ${rows.length} session(s)`);
 
     for (const row of rows) {
       const phone = String(row.phone_number);
@@ -179,7 +253,7 @@ async function bootstrap() {
   const HOST = '0.0.0.0';
 
   app.listen(PORT, HOST, () => {
-    console.log(`\n🚀 ${settings.botName} API running on http://${HOST}:${PORT}`);
+    console.log(`\n🚀 ${settings.botName} (instance ${INSTANCE_ID}/${INSTANCE_COUNT}) running on http://${HOST}:${PORT}`);
     console.log(`📡 Active sessions: ${sessionCount()}`);
     console.log(`🌍 CORS origin: ${process.env.CORS_ORIGIN || '*'}\n`);
   });
