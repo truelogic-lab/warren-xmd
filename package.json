@@ -17,6 +17,7 @@
     "@angstvorfrauen/baileys": "^3.0.3",
     "@hapi/boom": "^10.0.1",
     "@rodrigogs/baileys-store": "latest",
+    "@silent-tech-offc/ttdl": "^1.0.0",
     "acrcloud": "^1.4.0",
     "adm-zip": "^0.5.16",
     "awesome-phonenumber": "^7.2.0",
@@ -24,6 +25,7 @@
     "chalk": "^4.1.2",
     "check-disk-space": "^3.3.1",
     "cheerio": "0.22.0",
+    "cobalt-api": "^1.0.0",
     "cors": "^2.8.6",
     "css-select": "5.1.0",
     "dotenv": "^16.5.0",
@@ -55,7 +57,8 @@
     "steno": "^1.0.0",
     "webp-converter": "^3.0.1",
     "yargs": "^17.7.2",
-    "yt-search": "^2.13.1"
+    "yt-search": "^2.13.1",
+    "ytdl-plus": "^2.0.4"
   },
   "devDependencies": {
     "patch-package": "^8.0.1"
