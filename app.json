@@ -1,0 +1,64 @@
+{
+  "name": "warren-xmd",
+  "description": "Multi-session WhatsApp bot for group management and personal tools",
+  "repository": "https://github.com/YOUR_USERNAME/warren-xmd",
+  "logo": "https://your-domain.com/logo.png",
+  "keywords": ["whatsapp", "bot", "baileys", "warren-xmd"],
+  "stack": "container",
+  "env": {
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (from Heroku Postgres addon)",
+      "required": true
+    },
+    "API_KEY": {
+      "description": "Secret key for API authentication",
+      "generator": "secret",
+      "required": true
+    },
+    "JWT_SECRET": {
+      "description": "Secret for JWT signing",
+      "generator": "secret",
+      "required": true
+    },
+    "BOT_NAME": {
+      "description": "Your bot's display name",
+      "value": "Warren-xmd"
+    },
+    "BOT_PREFIX": {
+      "description": "Command prefix",
+      "value": "."
+    },
+    "BOT_MODE": {
+      "description": "public or private",
+      "value": "public"
+    },
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number (digits only)",
+      "required": true
+    },
+    "OWNER_NAME": {
+      "description": "Your display name",
+      "value": "Owner"
+    },
+    "CORS_ORIGIN": {
+      "description": "Your Vercel frontend URL",
+      "value": "https://warren-xmd.vercel.app"
+    },
+    "MAX_SESSIONS": {
+      "description": "Maximum concurrent sessions",
+      "value": "1500"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0",
+      "as": "DATABASE"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  }
+}
