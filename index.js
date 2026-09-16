@@ -19,9 +19,31 @@ import {
 dotenv.config();
 
 // ============================================
-// INSTANCE SHARDING
-// Static sharding — every session maps to a fixed instance.
-// When INSTANCE_COUNT=1, this instance handles everything (default).
+// Fix #3 — Global process error handlers
+// ============================================
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled rejection:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught exception:', err.message);
+  // Do NOT exit — log and keep running
+});
+
+// Fix #8 — Memory watchdog
+function startMemoryWatchdog() {
+  const LIMIT_MB = 900; // Railway Trial has 1 GB; alert at 900 MB
+  setInterval(() => {
+    const mem = process.memoryUsage();
+    const heapMB = mem.heapUsed / 1024 / 1024;
+    if (heapMB > LIMIT_MB) {
+      console.warn(`⚠️ Heap near limit: ${heapMB.toFixed(0)} MB / ${LIMIT_MB} MB`);
+    }
+  }, 60000).unref();
+}
+
+// ============================================
+// Instance sharding
 // ============================================
 const INSTANCE_ID = parseInt(process.env.INSTANCE_ID || '0');
 const INSTANCE_COUNT = parseInt(process.env.INSTANCE_COUNT || '1');
@@ -34,12 +56,9 @@ if (INSTANCE_ID >= INSTANCE_COUNT) {
 console.log(`🧩 Instance ${INSTANCE_ID} of ${INSTANCE_COUNT}`);
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 
-// ============================================
-// AUTH MIDDLEWARE
-// ============================================
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'];
   if (key !== process.env.API_KEY) {
@@ -48,30 +67,25 @@ function requireApiKey(req, res, next) {
   next();
 }
 
-// ============================================
-// CONNECT — request pairing code
-// The instance that receives the /connect request becomes the owner.
-// ============================================
 app.post('/connect', requireApiKey, async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number required' });
-
-  const cleanPhone = phone.replace(/\D/g, '');
-  if (cleanPhone.length < 10 || cleanPhone.length > 15) {
-    return res.status(400).json({ error: 'Invalid phone number format' });
-  }
-
-  // In multi-instance mode, only the shard owner should accept /connect
-  const shard = parseInt(cleanPhone) % INSTANCE_COUNT;
-  if (shard !== INSTANCE_ID) {
-    return res.status(409).json({
-      error: 'Wrong instance',
-      message: `This session belongs to instance ${shard}. Route /connect to the correct backend.`,
-      correctInstance: shard,
-    });
-  }
-
   try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone number required' });
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    const shard = parseInt(cleanPhone) % INSTANCE_COUNT;
+    if (shard !== INSTANCE_ID) {
+      return res.status(409).json({
+        error: 'Wrong instance',
+        message: `This session belongs to instance ${shard}.`,
+        correctInstance: shard,
+      });
+    }
+
     if (listSessions().includes(cleanPhone)) {
       return res.json({ status: 'already_connected', phone: cleanPhone });
     }
@@ -100,9 +114,6 @@ app.post('/connect', requireApiKey, async (req, res) => {
   }
 });
 
-// ============================================
-// STATUS — check if a session is active
-// ============================================
 app.get('/status/:phone', requireApiKey, (req, res) => {
   const cleanPhone = req.params.phone.replace(/\D/g, '');
   res.json({
@@ -112,9 +123,6 @@ app.get('/status/:phone', requireApiKey, (req, res) => {
   });
 });
 
-// ============================================
-// SESSIONS — list all active sessions (this instance only)
-// ============================================
 app.get('/sessions', requireApiKey, async (req, res) => {
   let proxies = [];
   try {
@@ -131,25 +139,18 @@ app.get('/sessions', requireApiKey, async (req, res) => {
   });
 });
 
-// ============================================
-// DISCONNECT — remove a session
-// ============================================
 app.post('/disconnect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Phone number required' });
   const cleanPhone = phone.replace(/\D/g, '');
-
   const removed = await removeSession(cleanPhone);
   res.json({ phone: cleanPhone, removed, instance: INSTANCE_ID });
 });
 
-// ============================================
-// CLUSTER — global view across all instances
-// ============================================
 app.get('/cluster', requireApiKey, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT 
+      `SELECT
          CAST(phone_number AS BIGINT) % $1 AS shard,
          COUNT(*) AS count
        FROM (
@@ -179,9 +180,6 @@ app.get('/cluster', requireApiKey, async (req, res) => {
   }
 });
 
-// ============================================
-// CACHE / RELOAD / INVALIDATE — dev tools
-// ============================================
 app.get('/cache', requireApiKey, async (req, res) => {
   const { cache } = await import('./lib/cache.js');
   res.json({ size: cache.size() });
@@ -199,10 +197,8 @@ app.post('/invalidate', requireApiKey, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ============================================
-// HEALTH — public health check
-// ============================================
 app.get('/health', (req, res) => {
+  const mem = process.memoryUsage();
   res.json({
     status: 'ok',
     bot: settings.botName,
@@ -210,12 +206,11 @@ app.get('/health', (req, res) => {
     instanceCount: INSTANCE_COUNT,
     activeSessions: sessionCount(),
     uptime: process.uptime(),
+    heapUsedMB: parseFloat((mem.heapUsed / 1024 / 1024).toFixed(1)),
+    heapTotalMB: parseFloat((mem.heapTotal / 1024 / 1024).toFixed(1)),
   });
 });
 
-// ============================================
-// BOOTSTRAP — restore only THIS instance's sessions
-// ============================================
 async function bootstrap() {
   const dbReady = await initDatabase();
   if (!dbReady) {
@@ -223,12 +218,13 @@ async function bootstrap() {
     process.exit(1);
   }
 
+  startMemoryWatchdog();
+
   try {
-    // Filter sessions to this shard only
     const { rows } = await pool.query(
-      `SELECT DISTINCT phone_number 
-       FROM auth_state 
-       WHERE key LIKE 'creds%' 
+      `SELECT DISTINCT phone_number
+       FROM auth_state
+       WHERE key LIKE 'creds%'
        AND (CAST(phone_number AS BIGINT) % $1) = $2`,
       [INSTANCE_COUNT, INSTANCE_ID]
     );
@@ -259,7 +255,6 @@ async function bootstrap() {
   });
 }
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received — closing...');
   await closeDatabase();
