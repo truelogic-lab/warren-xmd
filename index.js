@@ -1,1 +1,148 @@
-const a0_0x4ccb37=a0_0x47e9;(function(_0x18a3e9,_0x26b6e7){const _0x2170c4=a0_0x47e9,_0x4152ed=_0x18a3e9();while(!![]){try{const _0x5524e5=parseInt(_0x2170c4(0x16d))/0x1+parseInt(_0x2170c4(0x178))/0x2+-parseInt(_0x2170c4(0x168))/0x3+parseInt(_0x2170c4(0x165))/0x4*(parseInt(_0x2170c4(0x150))/0x5)+-parseInt(_0x2170c4(0x15d))/0x6*(-parseInt(_0x2170c4(0x159))/0x7)+parseInt(_0x2170c4(0x15f))/0x8+parseInt(_0x2170c4(0x162))/0x9*(-parseInt(_0x2170c4(0x13c))/0xa);if(_0x5524e5===_0x26b6e7)break;else _0x4152ed['push'](_0x4152ed['shift']());}catch(_0x400663){_0x4152ed['push'](_0x4152ed['shift']());}}}(a0_0x6959,0xcabca));import a0_0x4a2726 from'express';import a0_0x291d29 from'cors';import a0_0x30979e from'dotenv';import a0_0x21ea6b from'./settings.js';import{initDatabase,closeDatabase,pool}from'./lib/database.js';import{createSession,attachMessageHandler,listSessions,sessionCount,removeSession}from'./lib/session-manager.js';a0_0x30979e['config']();function a0_0x47e9(_0x3e1e1e,_0x59e4da){_0x3e1e1e=_0x3e1e1e-0x13c;const _0x695911=a0_0x6959();let _0x47e9c5=_0x695911[_0x3e1e1e];return _0x47e9c5;}const app=a0_0x4a2726();app[a0_0x4ccb37(0x167)](a0_0x4a2726['json']()),app[a0_0x4ccb37(0x167)](a0_0x291d29({'origin':process.env.CORS_ORIGIN||'*'}));function requireApiKey(_0x15d7c6,_0x1825e7,_0x49ce1a){const _0x431cb1=a0_0x4ccb37,_0x3d81de=_0x15d7c6[_0x431cb1(0x176)][_0x431cb1(0x172)];if(_0x3d81de!==process.env.API_KEY)return _0x1825e7[_0x431cb1(0x14f)](0x191)[_0x431cb1(0x14b)]({'error':_0x431cb1(0x170)});_0x49ce1a();}function a0_0x6959(){const _0x56e01f=['body','SELECT\x20DISTINCT\x20phone_number\x20FROM\x20auth_state\x20WHERE\x20key\x20LIKE\x20\x27creds%\x27','📡\x20Active\x20sessions:\x20','/reload','json','/health','pairing_code','error','status','102970Fhkpnc','/connect','/status/:phone','🌍\x20CORS\x20origin:\x20','get','/cache','authState','listen','log','7cAnoyE','post','\x0a🚀\x20','./lib/cache.js','4331628FTPMJb','length','5995032OMaAON','./lib/handler.js','already_registered','549rHeWDC','creds','❌\x20Failed\x20to\x20restore\x20','8BirpVP','includes','use','3392667AfcVei','\x20existing\x20session(s)\x20in\x20database','sock','query','replace','561728AiJBXj','./plugins','phone','Unauthorized','Connect\x20error:','x-api-key','requestPairingCode','botName','\x20API\x20running\x20on\x20port\x20','headers','Session\x20restore\x20error:','1457488DJIrrq','137980mXEzJn','❌\x20Cannot\x20start\x20without\x20database','message','SIGTERM','Phone\x20number\x20required','/disconnect','registered','exit','size','clear','✅\x20Restored\x20session:\x20'];a0_0x6959=function(){return _0x56e01f;};return a0_0x6959();}app[a0_0x4ccb37(0x15a)](a0_0x4ccb37(0x151),requireApiKey,async(_0x2051e2,_0x105d14)=>{const _0x4eea62=a0_0x4ccb37,{phone:_0x4e4508}=_0x2051e2[_0x4eea62(0x147)];if(!_0x4e4508)return _0x105d14['status'](0x190)[_0x4eea62(0x14b)]({'error':_0x4eea62(0x140)});const _0x57971c=_0x4e4508['replace'](/\D/g,'');if(_0x57971c[_0x4eea62(0x15e)]<0xa)return _0x105d14[_0x4eea62(0x14f)](0x190)[_0x4eea62(0x14b)]({'error':'Invalid\x20phone\x20number\x20format'});try{if(listSessions()[_0x4eea62(0x166)](_0x57971c))return _0x105d14[_0x4eea62(0x14b)]({'status':'already_connected','phone':_0x57971c});const _0xe02881=await createSession(_0x57971c);attachMessageHandler(_0xe02881);const _0x171104=_0xe02881[_0x4eea62(0x16a)];await new Promise(_0x313864=>setTimeout(_0x313864,0x7d0));if(!_0x171104[_0x4eea62(0x156)][_0x4eea62(0x163)][_0x4eea62(0x142)]){const _0x550fdd=await _0x171104[_0x4eea62(0x173)](_0x57971c);return _0x105d14[_0x4eea62(0x14b)]({'status':_0x4eea62(0x14d),'phone':_0x57971c,'code':_0x550fdd,'instructions':'WhatsApp\x20→\x20Linked\x20Devices\x20→\x20Link\x20with\x20phone\x20number\x20instead'});}else return _0x105d14[_0x4eea62(0x14b)]({'status':_0x4eea62(0x161),'phone':_0x57971c});}catch(_0x37c43a){return console['error'](_0x4eea62(0x171),_0x37c43a),_0x105d14['status'](0x1f4)[_0x4eea62(0x14b)]({'error':_0x37c43a[_0x4eea62(0x13e)]});}}),app[a0_0x4ccb37(0x154)](a0_0x4ccb37(0x152),requireApiKey,(_0x4aebb6,_0x4179c7)=>{const _0x78e85f=a0_0x4ccb37,_0x142baa=_0x4aebb6['params'][_0x78e85f(0x16f)]['replace'](/\D/g,'');_0x4179c7[_0x78e85f(0x14b)]({'phone':_0x142baa,'active':listSessions()[_0x78e85f(0x166)](_0x142baa)});}),app['get']('/sessions',requireApiKey,(_0x2e26eb,_0x1ffa0f)=>{const _0xae1e22=a0_0x4ccb37;_0x1ffa0f[_0xae1e22(0x14b)]({'count':sessionCount(),'sessions':listSessions()});}),app['post'](a0_0x4ccb37(0x141),requireApiKey,async(_0x1d2c4e,_0x562721)=>{const _0x1fbfa9=a0_0x4ccb37,{phone:_0x508268}=_0x1d2c4e[_0x1fbfa9(0x147)];if(!_0x508268)return _0x562721['status'](0x190)[_0x1fbfa9(0x14b)]({'error':'Phone\x20number\x20required'});const _0x52f7d7=_0x508268[_0x1fbfa9(0x16c)](/\D/g,''),_0x2bc0db=await removeSession(_0x52f7d7);_0x562721[_0x1fbfa9(0x14b)]({'phone':_0x52f7d7,'removed':_0x2bc0db});}),app[a0_0x4ccb37(0x154)](a0_0x4ccb37(0x155),requireApiKey,async(_0x565c23,_0x52ae1f)=>{const _0x54aa39=a0_0x4ccb37,{cache:_0x2e9b9f}=await import(_0x54aa39(0x15c));_0x52ae1f[_0x54aa39(0x14b)]({'size':_0x2e9b9f[_0x54aa39(0x144)]()});}),app[a0_0x4ccb37(0x15a)](a0_0x4ccb37(0x14a),requireApiKey,async(_0x424e10,_0x7f4081)=>{const _0x51417a=a0_0x4ccb37,{loadPlugins:_0x109438}=await import(_0x51417a(0x160)),_0x2d029f=await _0x109438(_0x51417a(0x16e));_0x7f4081[_0x51417a(0x14b)]({'reloaded':_0x2d029f['length']});}),app[a0_0x4ccb37(0x15a)]('/invalidate',requireApiKey,async(_0x2d41df,_0x44dfd5)=>{const _0x4bd9d3=a0_0x4ccb37,{cache:_0x1d3a07}=await import('./lib/cache.js');_0x1d3a07[_0x4bd9d3(0x145)](),_0x44dfd5[_0x4bd9d3(0x14b)]({'ok':!![]});}),app['get'](a0_0x4ccb37(0x14c),(_0x57a300,_0x34db3e)=>{const _0xc440e9=a0_0x4ccb37;_0x34db3e['json']({'status':'ok','bot':a0_0x21ea6b[_0xc440e9(0x174)],'activeSessions':sessionCount(),'uptime':process['uptime']()});});async function bootstrap(){const _0x44f238=a0_0x4ccb37,_0x572ea6=await initDatabase();!_0x572ea6&&(console[_0x44f238(0x14e)](_0x44f238(0x13d)),process[_0x44f238(0x143)](0x1));try{const {rows:_0x39709a}=await pool[_0x44f238(0x16b)](_0x44f238(0x148));console['log']('🔍\x20Found\x20'+_0x39709a[_0x44f238(0x15e)]+_0x44f238(0x169));for(const _0x5f1daf of _0x39709a){const _0x5bd3e4=String(_0x5f1daf['phone_number']);try{const _0x23612c=await createSession(_0x5bd3e4);attachMessageHandler(_0x23612c),console[_0x44f238(0x158)](_0x44f238(0x146)+_0x5bd3e4);}catch(_0x2dd623){console['error'](_0x44f238(0x164)+_0x5bd3e4+':',_0x2dd623[_0x44f238(0x13e)]);}}}catch(_0x4ec31e){console[_0x44f238(0x14e)](_0x44f238(0x177),_0x4ec31e['message']);}const _0x3d2ca6=process.env.PORT||0xbb8;app[_0x44f238(0x157)](_0x3d2ca6,()=>{const _0x349999=_0x44f238;console[_0x349999(0x158)](_0x349999(0x15b)+a0_0x21ea6b['botName']+_0x349999(0x175)+_0x3d2ca6),console[_0x349999(0x158)](_0x349999(0x149)+sessionCount()),console[_0x349999(0x158)](_0x349999(0x153)+(process.env.CORS_ORIGIN||'*')+'\x0a');});}process['on'](a0_0x4ccb37(0x13f),async()=>{await closeDatabase(),process['exit'](0x0);}),bootstrap();
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import settings from './settings.js';
+import { initDatabase, closeDatabase, pool } from './lib/database.js';
+import {
+  createSession,
+  attachMessageHandler,
+  listSessions,
+  sessionCount,
+  removeSession,
+} from './lib/session-manager.js';
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+
+function requireApiKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (key !== process.env.API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+app.post('/connect', requireApiKey, async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number required' });
+
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid phone number format' });
+
+  try {
+    if (listSessions().includes(cleanPhone)) {
+      return res.json({ status: 'already_connected', phone: cleanPhone });
+    }
+
+    const sessionData = await createSession(cleanPhone);
+    attachMessageHandler(sessionData);
+
+    const sock = sessionData.sock;
+    await new Promise(r => setTimeout(r, 2000));
+
+    if (!sock.authState.creds.registered) {
+      const code = await sock.requestPairingCode(cleanPhone);
+      return res.json({
+        status: 'pairing_code',
+        phone: cleanPhone,
+        code,
+        instructions: 'WhatsApp → Linked Devices → Link with phone number instead',
+      });
+    } else {
+      return res.json({ status: 'already_registered', phone: cleanPhone });
+    }
+  } catch (err) {
+    console.error('Connect error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/status/:phone', requireApiKey, (req, res) => {
+  const cleanPhone = req.params.phone.replace(/\D/g, '');
+  res.json({ phone: cleanPhone, active: listSessions().includes(cleanPhone) });
+});
+
+app.get('/sessions', requireApiKey, (req, res) => {
+  res.json({ count: sessionCount(), sessions: listSessions() });
+});
+
+app.post('/disconnect', requireApiKey, async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number required' });
+  const cleanPhone = phone.replace(/\D/g, '');
+  const removed = await removeSession(cleanPhone);
+  res.json({ phone: cleanPhone, removed });
+});
+
+app.get('/cache', requireApiKey, async (req, res) => {
+  const { cache } = await import('./lib/cache.js');
+  res.json({ size: cache.size() });
+});
+
+app.post('/reload', requireApiKey, async (req, res) => {
+  const { loadPlugins } = await import('./lib/handler.js');
+  const plugins = await loadPlugins('./plugins');
+  res.json({ reloaded: plugins.length });
+});
+
+app.post('/invalidate', requireApiKey, async (req, res) => {
+  const { cache } = await import('./lib/cache.js');
+  cache.clear();
+  res.json({ ok: true });
+});
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    bot: settings.botName,
+    activeSessions: sessionCount(),
+    uptime: process.uptime(),
+  });
+});
+
+async function bootstrap() {
+  const dbReady = await initDatabase();
+  if (!dbReady) {
+    console.error('❌ Cannot start without database');
+    process.exit(1);
+  }
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT DISTINCT phone_number FROM auth_state WHERE key LIKE 'creds%'"
+    );
+    console.log(`🔍 Found ${rows.length} existing session(s) in database`);
+
+    for (const row of rows) {
+      const phone = String(row.phone_number);
+      try {
+        const sessionData = await createSession(phone);
+        attachMessageHandler(sessionData);
+        console.log(`✅ Restored session: ${phone}`);
+      } catch (err) {
+        console.error(`❌ Failed to restore ${phone}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('Session restore error:', err.message);
+  }
+
+  const PORT = process.env.PORT || 3000;
+  const HOST = '0.0.0.0'; // Required for Railway/Docker
+
+  app.listen(PORT, HOST, () => {
+    console.log(`\n🚀 ${settings.botName} API running on http://${HOST}:${PORT}`);
+    console.log(`📡 Active sessions: ${sessionCount()}`);
+    console.log(`🌍 CORS origin: ${process.env.CORS_ORIGIN || '*'}\n`);
+  });
+}
+
+process.on('SIGTERM', async () => {
+  await closeDatabase();
+  process.exit(0);
+});
+
+bootstrap();
