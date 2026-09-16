@@ -8,6 +8,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import settings from './settings.js';
 import { initDatabase, closeDatabase, pool } from './lib/database.js';
+import { flushAntibanState } from './lib/antiban.js';
 import {
   createSession,
   attachMessageHandler,
@@ -257,12 +258,14 @@ async function bootstrap() {
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received — closing...');
+  await flushAntibanState().catch(() => {}); // don't lose the last <15s of counters
   await closeDatabase();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received — closing...');
+  await flushAntibanState().catch(() => {});
   await closeDatabase();
   process.exit(0);
 });
