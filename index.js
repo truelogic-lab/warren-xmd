@@ -8,32 +8,27 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import settings from './settings.js';
 import { initDatabase, closeDatabase, pool } from './lib/database.js';
-import { flushAntibanState } from './lib/antiban.js';
 import {
   createSession,
   attachMessageHandler,
   listSessions,
   sessionCount,
   removeSession,
+  getSession,
 } from './lib/session-manager.js';
 
 dotenv.config();
 
-// ============================================
-// Fix #3 — Global process error handlers
-// ============================================
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled rejection:', reason?.message || reason);
 });
 
 process.on('uncaughtException', (err) => {
   console.error('💥 Uncaught exception:', err.message);
-  // Do NOT exit — log and keep running
 });
 
-// Fix #8 — Memory watchdog
 function startMemoryWatchdog() {
-  const LIMIT_MB = 900; // Railway Trial has 1 GB; alert at 900 MB
+  const LIMIT_MB = 900;
   setInterval(() => {
     const mem = process.memoryUsage();
     const heapMB = mem.heapUsed / 1024 / 1024;
@@ -43,9 +38,6 @@ function startMemoryWatchdog() {
   }, 60000).unref();
 }
 
-// ============================================
-// Instance sharding
-// ============================================
 const INSTANCE_ID = parseInt(process.env.INSTANCE_ID || '0');
 const INSTANCE_COUNT = parseInt(process.env.INSTANCE_COUNT || '1');
 
@@ -87,8 +79,20 @@ app.post('/connect', requireApiKey, async (req, res) => {
       });
     }
 
+    // If number is already fully connected, tell the user
     if (listSessions().includes(cleanPhone)) {
-      return res.json({ status: 'already_connected', phone: cleanPhone });
+      const existing = getSession(cleanPhone);
+      if (existing?.sock?.user) {
+        return res.json({ status: 'already_connected', phone: cleanPhone });
+      }
+    }
+
+    // FIX — Clean up any stale pairing session before creating a new one.
+    // This prevents the 428 error when a previous pairing attempt is still in memory.
+    const stale = getSession(cleanPhone);
+    if (stale) {
+      console.log(`♻️ Clearing stale pairing session for ${cleanPhone}`);
+      await removeSession(cleanPhone);
     }
 
     const sessionData = await createSession(cleanPhone);
@@ -258,14 +262,12 @@ async function bootstrap() {
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received — closing...');
-  await flushAntibanState().catch(() => {}); // don't lose the last <15s of counters
   await closeDatabase();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received — closing...');
-  await flushAntibanState().catch(() => {});
   await closeDatabase();
   process.exit(0);
 });
