@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@angstvorfrauen/baileys';
+import { downloadMediaMessage } from '@zentrix/baileys';
 import webp from 'webp-converter';
 import fs from 'fs-extra';
 import path from 'path';

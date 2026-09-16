@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@angstvorfrauen/baileys';
+import { downloadMediaMessage } from '@zentrix/baileys';
 import { invalidateGroup } from './_helpers.js';
 
 export default {

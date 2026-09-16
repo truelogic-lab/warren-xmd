@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@angstvorfrauen/baileys';
+import { downloadMediaMessage } from '@zentrix/baileys';
 
 export default {
   name: "ViewOnce",
