@@ -52,6 +52,9 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 
+// In-flight pairing locks — prevents two simultaneous /connect calls for the SAME number
+const pairingLocks = new Map();
+
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'];
   if (key !== process.env.API_KEY) {
@@ -61,15 +64,17 @@ function requireApiKey(req, res, next) {
 }
 
 app.post('/connect', requireApiKey, async (req, res) => {
+  let cleanPhone = '';
   try {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: 'Phone number required' });
 
-    const cleanPhone = phone.replace(/\D/g, '');
+    cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10 || cleanPhone.length > 15) {
       return res.status(400).json({ error: 'Invalid phone number format' });
     }
 
+    // Shard check
     const shard = parseInt(cleanPhone) % INSTANCE_COUNT;
     if (shard !== INSTANCE_ID) {
       return res.status(409).json({
@@ -79,30 +84,59 @@ app.post('/connect', requireApiKey, async (req, res) => {
       });
     }
 
-    // If number is already fully connected, tell the user
-    if (listSessions().includes(cleanPhone)) {
-      const existing = getSession(cleanPhone);
-      if (existing?.sock?.user) {
-        return res.json({ status: 'already_connected', phone: cleanPhone });
-      }
+    // Already fully connected?
+    const existing = getSession(cleanPhone);
+    if (existing?.sock?.user) {
+      return res.json({
+        status: 'already_connected',
+        phone: cleanPhone,
+        message: 'This number is already linked and active.',
+      });
     }
 
-    // FIX — Clean up any stale pairing session before creating a new one.
-    // This prevents the 428 error when a previous pairing attempt is still in memory.
-    const stale = getSession(cleanPhone);
-    if (stale) {
-      console.log(`♻️ Clearing stale pairing session for ${cleanPhone}`);
+    // Another request is already pairing this same number?
+    if (pairingLocks.has(cleanPhone)) {
+      return res.status(429).json({
+        error: 'Pairing in progress',
+        message: 'Another request is already pairing this number. Wait 30 seconds and try again.',
+      });
+    }
+
+    // Lock this number for the duration of pairing
+    pairingLocks.set(cleanPhone, Date.now());
+
+    // Clean up any dead session object (not a live one)
+    if (existing && !existing.sock?.user) {
+      // Wait a moment — maybe it's mid-pairing already
+      await new Promise(r => setTimeout(r, 500));
+      const recheck = getSession(cleanPhone);
+      if (recheck?.sock?.user) {
+        pairingLocks.delete(cleanPhone);
+        return res.json({ status: 'already_connected', phone: cleanPhone });
+      }
+      // Really dead — destroy it
+      console.log(`♻️ Removing dead session for ${cleanPhone}`);
       await removeSession(cleanPhone);
     }
 
+    // Create a fresh session for this number (other numbers can pair in parallel)
     const sessionData = await createSession(cleanPhone);
     attachMessageHandler(sessionData);
 
     const sock = sessionData.sock;
-    await new Promise(r => setTimeout(r, 2000));
+
+    // Wait up to 5 seconds for socket to be ready for pairing
+    let waited = 0;
+    while (waited < 5000 && !sock.authState?.creds) {
+      await new Promise(r => setTimeout(r, 200));
+      waited += 200;
+    }
+
+    await new Promise(r => setTimeout(r, 1500));
 
     if (!sock.authState.creds.registered) {
       const code = await sock.requestPairingCode(cleanPhone);
+      pairingLocks.delete(cleanPhone);
       return res.json({
         status: 'pairing_code',
         phone: cleanPhone,
@@ -112,18 +146,28 @@ app.post('/connect', requireApiKey, async (req, res) => {
       });
     }
 
+    pairingLocks.delete(cleanPhone);
     return res.json({ status: 'already_registered', phone: cleanPhone });
   } catch (err) {
     console.error('Connect error:', err);
+    if (cleanPhone) pairingLocks.delete(cleanPhone);
+
+    // If the request fails, destroy the half-built session so a retry works
+    if (cleanPhone) {
+      try { await removeSession(cleanPhone); } catch {}
+    }
+
     return res.status(500).json({ error: err.message });
   }
 });
 
 app.get('/status/:phone', requireApiKey, (req, res) => {
   const cleanPhone = req.params.phone.replace(/\D/g, '');
+  const session = getSession(cleanPhone);
   res.json({
     phone: cleanPhone,
-    active: listSessions().includes(cleanPhone),
+    active: !!session?.sock?.user,
+    pairing: pairingLocks.has(cleanPhone),
     instance: INSTANCE_ID,
   });
 });
@@ -140,6 +184,7 @@ app.get('/sessions', requireApiKey, async (req, res) => {
     instanceCount: INSTANCE_COUNT,
     count: sessionCount(),
     sessions: listSessions(),
+    pairingInProgress: Array.from(pairingLocks.keys()),
     proxies,
   });
 });
@@ -148,6 +193,7 @@ app.post('/disconnect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Phone number required' });
   const cleanPhone = phone.replace(/\D/g, '');
+  pairingLocks.delete(cleanPhone);
   const removed = await removeSession(cleanPhone);
   res.json({ phone: cleanPhone, removed, instance: INSTANCE_ID });
 });
@@ -210,6 +256,7 @@ app.get('/health', (req, res) => {
     instance: INSTANCE_ID,
     instanceCount: INSTANCE_COUNT,
     activeSessions: sessionCount(),
+    pairingInProgress: pairingLocks.size,
     uptime: process.uptime(),
     heapUsedMB: parseFloat((mem.heapUsed / 1024 / 1024).toFixed(1)),
     heapTotalMB: parseFloat((mem.heapTotal / 1024 / 1024).toFixed(1)),
