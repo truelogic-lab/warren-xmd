@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@zentrix/baileys';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 
 export default {
   name: "SetPP",

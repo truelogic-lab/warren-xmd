@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@zentrix/baileys';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { invalidateGroup } from './_helpers.js';
 
 export default {

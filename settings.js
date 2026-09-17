@@ -15,7 +15,7 @@ export default {
   botName: process.env.BOT_NAME || 'Warren-xmd',
   ownerName: process.env.OWNER_NAME || 'Warren',
   ownerNumber: process.env.OWNER_NUMBER || '',
-  version: process.env.BOT_VERSION || pkg.version || '1.0.0',
+  version: process.env.BOT_VERSION || pkg.version || '3.0.0',
   author: 'Warren Musungu',
   github: 'https://github.com/truelogic-lab/warren-xmd',
   website: 'https://warren-xmd.vercel.app',
@@ -29,6 +29,13 @@ export default {
   maxSessions: parseInt(process.env.MAX_SESSIONS) || 1500,
   reconnectInterval: parseInt(process.env.RECONNECT_INTERVAL) || 5000,
   maxReconnectRetries: parseInt(process.env.MAX_RECONNECT_RETRIES) || 10,
+
+  // ---------- API & clustering ----------
+  apiMode: process.env.API_MODE === 'true',
+  apiKey: process.env.API_KEY || '',
+  corsOrigin: process.env.CORS_ORIGIN || '*',
+  instanceId: parseInt(process.env.INSTANCE_ID || '0'),
+  instanceCount: parseInt(process.env.INSTANCE_COUNT || '1'),
 
   // ---------- Sticker metadata ----------
   sticker: {
