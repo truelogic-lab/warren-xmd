@@ -102,7 +102,7 @@ app.post('/connect', requireApiKey, async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: 'Phone number required' });
 
-    cleanPhone = phone.replace(/D/g, '');
+    cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10 || cleanPhone.length > 15) {
       return res.status(400).json({ error: 'Invalid phone number format' });
     }
@@ -206,7 +206,7 @@ app.post('/connect', requireApiKey, async (req, res) => {
 });
 
 app.get('/status/:phone', requireApiKey, (req, res) => {
-  const cleanPhone = req.params.phone.replace(/D/g, '');
+  const cleanPhone = req.params.phone.replace(/\D/g, '');
   const session = getSession(cleanPhone);
   res.json({
     phone: cleanPhone,
@@ -236,7 +236,7 @@ app.get('/sessions', requireApiKey, async (req, res) => {
 app.post('/disconnect', requireApiKey, async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Phone number required' });
-  const cleanPhone = phone.replace(/D/g, '');
+  const cleanPhone = phone.replace(/\D/g, '');
 
   const limit = checkRateLimit(cleanPhone);
   if (!limit.ok) {
